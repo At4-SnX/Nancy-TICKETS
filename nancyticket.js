@@ -2,7 +2,7 @@ require("dotenv").config();
 const { 
     Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, 
     StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, 
-    PermissionsBitField, ButtonBuilder, ButtonStyle 
+    PermissionsBitField 
 } = require("discord.js");
 
 const client = new Client({ 
@@ -10,63 +10,45 @@ const client = new Client({
     partials: [Partials.Channel] 
 });
 
-// --- CONFIGURATION ---
 const STAFF_ROLE = "1505943612507295826";
-const LOCK_ROLE = "1505943624200884426"; // Le rôle qui sera bloqué
+const LOCK_ROLE = "1505943624200884426";
 const LOG_CHANNEL = "1506375933051932753";
 
-// --- COMMANDE DE PANNEAU (!sendpanel) ---
+// --- 1. PANNEAU ESTHÉTIQUE ---
 client.on("messageCreate", async (m) => {
     if (m.content === "!sendpanel" && m.member.permissions.has("Administrator")) {
-        const menu = new StringSelectMenuBuilder()
-            .setCustomId("ticket_menu")
-            .setPlaceholder("🔵 Cliquez ici pour ouvrir une demande")
+        const embed = new EmbedBuilder()
+            .setTitle("🎫 Centre d'Assistance - Nancy RP")
+            .setDescription("Bienvenue au support. Sélectionnez une catégorie ci-dessous pour ouvrir un ticket.")
+            .setColor("#2B2D31") // Couleur sombre élégante
+            .setFooter({ text: "Nancy RP Support", iconURL: m.guild.iconURL() });
+
+        const menu = new StringSelectMenuBuilder().setCustomId("ticket_menu").setPlaceholder("📂 Choisissez une catégorie")
             .addOptions([
-                { label: "❓ Question", value: "question" },
-                { label: "🛡️ Report Staff", value: "reportstaff" },
-                { label: "⚠️ Report Joueur", value: "reportjoueur" },
-                { label: "📘 Demande Légal", value: "legal" },
-                { label: "📕 Demande Illégal", value: "illegal" },
-                { label: "🏛️ Fondation", value: "fondation" }
+                { label: "❓ Question", value: "question", emoji: "❓" },
+                { label: "🛡️ Report Staff", value: "reportstaff", emoji: "🛡️" },
+                { label: "⚠️ Report Joueur", value: "reportjoueur", emoji: "⚠️" },
+                { label: "📘 Demande Légal", value: "legal", emoji: "📘" }
             ]);
-        await m.channel.send({ 
-            content: "🎫 **Centre d'assistance Nancy RP**\nChoisissez la catégorie correspondant à votre demande :", 
-            components: [new ActionRowBuilder().addComponents(menu)] 
-        });
+        await m.channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] });
         await m.delete();
     }
 });
 
-// --- FONCTION FORMULAIRE ---
-function getModal(type) {
-    const modal = new ModalBuilder().setCustomId(`modal_${type}`).setTitle("Formulaire : " + type.toUpperCase());
-    
-    if (type === "reportjoueur") {
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("q1").setLabel("Nom du joueur accusé").setStyle(TextInputStyle.Short).setRequired(true)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("q2").setLabel("Raison précise").setStyle(TextInputStyle.Paragraph).setRequired(true)),
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("q3").setLabel("Preuve (Lien)").setStyle(TextInputStyle.Short).setRequired(true))
-        );
-    } else {
-        modal.addComponents(
-            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("q1").setLabel("Détails de votre demande").setStyle(TextInputStyle.Paragraph).setRequired(true))
-        );
-    }
-    return modal;
-}
-
-// --- GESTION DES INTERACTIONS ---
+// --- 2. LOGIQUE D'INTERACTION ---
 client.on("interactionCreate", async (i) => {
-    // 1. Menu sélection -> Affiche le formulaire
-    if (i.isStringSelectMenu() && i.customId === "ticket_menu") await i.showModal(getModal(i.values[0]));
-
-    // 2. Soumission formulaire -> Création salon
-    else if (i.isModalSubmit() && i.customId.startsWith("modal_")) {
+    // Menu -> Formulaire
+    if (i.isStringSelectMenu() && i.customId === "ticket_menu") {
+        const modal = new ModalBuilder().setCustomId(`m_${i.values[0]}`).setTitle("Détails de votre ticket");
+        modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("d").setLabel("Expliquez votre problème").setStyle(TextInputStyle.Paragraph).setRequired(true)));
+        await i.showModal(modal);
+    }
+    
+    // Création salon
+    else if (i.isModalSubmit() && i.customId.startsWith("m_")) {
         const type = i.customId.split("_")[1];
-        const details = i.fields.getTextInputValue("q1");
-        
         const channel = await i.guild.channels.create({
-            name: `🎫・${type}-${i.user.username}`,
+            name: `🎫・${i.user.username}`,
             permissionOverwrites: [
                 { id: i.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
                 { id: i.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
@@ -74,75 +56,32 @@ client.on("interactionCreate", async (i) => {
             ]
         });
 
-        const menu = new StringSelectMenuBuilder().setCustomId("ticket_control").addOptions([
-            { label: "🧷 Prendre en charge", value: "claim" },
-            { label: "🔒 Verrouiller (Lock)", value: "lock" },
-            { label: "➕ Ajouter un membre", value: "add" },
+        const embed = new EmbedBuilder()
+            .setTitle(`Ticket : ${type.toUpperCase()}`)
+            .setDescription(`**Utilisateur :** ${i.user}\n**Détails :** ${i.fields.getTextInputValue("d")}`)
+            .setColor("#5865F2");
+
+        const menu = new StringSelectMenuBuilder().setCustomId("ctrl").addOptions([
+            { label: "🔒 Verrouiller", value: "lock" },
+            { label: "➕ Ajouter Membre", value: "add" },
             { label: "🗑️ Fermer le ticket", value: "close" }
         ]);
 
-        await channel.send({ 
-            content: `<@&${STAFF_ROLE}>, nouveau ticket de ${i.user}`, 
-            embeds: [new EmbedBuilder().setTitle("Détails").setDescription(details).setColor("#237FEB")],
-            components: [new ActionRowBuilder().addComponents(menu)] 
-        });
-        await i.reply({ content: `✅ Ticket créé : ${channel}`, ephemeral: true });
+        await channel.send({ content: `<@&${STAFF_ROLE}>`, embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] });
+        await i.reply({ content: `✅ Ticket ouvert : ${channel}`, ephemeral: true });
     }
 
-    // 3. Menu contrôle Staff
-// 3. Menu contrôle Staff
-    else if (i.isStringSelectMenu() && i.customId === "ticket_control") {
-        if (!i.member.roles.cache.has(STAFF_ROLE)) return i.reply({ ephemeral: true, content: "❌ Réservé aux staffs." });
-        const val = i.values[0];
-
-        if (val === "claim") {
-            await i.reply(`🧷 Pris en charge par ${i.user}`);
-        } 
-        else if (val === "lock") {
+    // Contrôle Ticket
+    else if (i.isStringSelectMenu() && i.customId === "ctrl") {
+        if (!i.member.roles.cache.has(STAFF_ROLE)) return i.reply({ content: "❌ Accès refusé.", ephemeral: true });
+        
+        if (i.values[0] === "lock") {
             await i.channel.permissionOverwrites.edit(LOCK_ROLE, { SendMessages: false });
-            await i.reply("🔒 Le rôle cible ne peut plus écrire.");
-        } 
-        else if (val === "add") {
-            const m = new ModalBuilder()
-                .setCustomId("m_add")
-                .setTitle("Ajout membre")
-                .addComponents(new ActionRowBuilder().addComponents(
-                    new TextInputBuilder().setCustomId("uid").setLabel("ID Discord du membre").setStyle(TextInputStyle.Short).setRequired(true)
-                ));
-            await i.showModal(m);
-        } 
-        else if (val === "close") {
-            const members = await i.channel.members.fetch();
-            const userToRate = members.find(m => !m.user.bot && m.id !== i.user.id);
-
-            if (userToRate) {
-                try {
-                    const row = new ActionRowBuilder().addComponents([1, 2, 3, 4, 5].map(n => 
-                        new ButtonBuilder().setCustomId(`rate_${n}`).setLabel(n.toString()).setStyle(ButtonStyle.Primary)
-                    ));
-                    await userToRate.send({ 
-                        content: `🎫 Votre ticket chez **Nancy RP** a été fermé. Veuillez noter la prise en charge :`, 
-                        components: [row] 
-                    });
-                } catch (err) {
-                    await i.channel.send("⚠️ Impossible d'envoyer le MP (MP fermés).");
-                }
-            }
-
-            const transcript = (await i.channel.messages.fetch({ limit: 100 })).map(m => `[${m.author.tag}]: ${m.content}`).reverse().join("\n");
-            await i.guild.channels.cache.get(LOG_CHANNEL).send({ content: "📄 Transcript :", files: [{ attachment: Buffer.from(transcript), name: "transcript.txt" }] });
-            
-            await i.reply("🗑️ Suppression du salon dans 3 secondes...");
-            setTimeout(() => i.channel.delete(), 3000);
-        } 
-    }
-    // 4. Action Ajout membre & Notation
-    else if (i.isModalSubmit() && i.customId === "m_add") {
-        await i.channel.permissionOverwrites.edit(i.fields.getTextInputValue("uid"), { ViewChannel: true, SendMessages: true });
-        await i.reply("➕ Membre ajouté au ticket.");
-    }
-    else if (i.isButton() && i.customId.startsWith("rate_")) {
-        await i.update({ content: `✅ Note enregistrée : ${i.customId.split("_")[1]}/5`, components: [] });
+            await i.reply("🔒 Ticket verrouillé.");
+        } else if (i.values[0] === "close") {
+            await i.reply("🗑️ Suppression...");
+            setTimeout(() => i.channel.delete(), 2000);
+        }
     }
 });
 
