@@ -1,0 +1,19 @@
+# Dépendances (Le plus important)
+node_modules/
+
+# Fichiers sensibles
+.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dossiers temporaires / de build
+dist/
+build/
+*.log
+
+# Fichiers système
+.DS_Store
+Thumbs.db
