@@ -126,4 +126,34 @@ client.on("interactionCreate", async interaction => {
     }
 });
 
+client.on("messageCreate", async (message) => {
+    // Commande : !sendpanel (à taper dans le salon voulu)
+    if (message.content === "!sendpanel" && message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+        
+        const embed = new EmbedBuilder()
+            .setTitle("🎫 Support Nancy RP")
+            .setDescription("Bienvenue sur le support. Choisissez une catégorie pour ouvrir un ticket.")
+            .setColor("#237FEB");
+
+        const menu = new StringSelectMenuBuilder()
+            .setCustomId("ticket_menu")
+            .setPlaceholder("🔵 Choisissez une catégorie")
+            .addOptions([
+                { label: "❓ Question", value: "question" },
+                { label: "🤝 Partenariat", value: "partenariat" },
+                { label: "🛡️ Report Staff", value: "reportstaff" },
+                { label: "⚠️ Report Joueur", value: "reportjoueur" },
+                { label: "📘 Demande Légal", value: "legal" },
+                { label: "📕 Demande Illégal", value: "illegal" },
+                { label: "🏛️ Fondation", value: "fondation" },
+                { label: "🚨 Prioritaire", value: "prioritaire" }
+            ]);
+
+        const row = new ActionRowBuilder().addComponents(menu);
+
+        await message.channel.send({ embeds: [embed], components: [row] });
+        await message.delete(); // Supprime ton message de commande pour faire propre
+    }
+});
+
 client.login(process.env.TOKEN);
