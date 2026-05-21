@@ -104,15 +104,34 @@ client.on("interactionCreate", async (i) => {
             await i.showModal(m);
         }
         else if (val === "close") {
+            // 1. Récupérer l'utilisateur qui a ouvert le ticket (il est souvent mentionné dans le nom du salon)
+            // Note : Pour être sûr, on peut aussi stocker l'ID de l'auteur au moment de la création
+            // Ici, on récupère le créateur via le nom du salon (format: 🎫・type-username)
+            const members = await i.channel.members.fetch();
+            // On cherche l'utilisateur qui n'est pas le bot
+            const userToRate = members.find(m => !m.user.bot && m.id !== i.user.id);
+
+            if (userToRate) {
+                try {
+                    const row = new ActionRowBuilder().addComponents([1,2,3,4,5].map(n => 
+                        new ButtonBuilder().setCustomId(`rate_${n}`).setLabel(n.toString()).setStyle(ButtonStyle.Primary)
+                    ));
+                    await userToRate.send({ 
+                        content: `🎫 Votre ticket chez **Nancy RP** a été fermé. Veuillez noter la prise en charge :`, 
+                        components: [row] 
+                    });
+                } catch (err) {
+                    await i.channel.send("⚠️ Impossible d'envoyer le MP (MP fermés).");
+                }
+            }
+
+            // 2. Transcript dans les logs
             const transcript = (await i.channel.messages.fetch({ limit: 100 })).map(m => `[${m.author.tag}]: ${m.content}`).reverse().join("\n");
             await i.guild.channels.cache.get(LOG_CHANNEL).send({ content: "📄 Transcript :", files: [{ attachment: Buffer.from(transcript), name: "transcript.txt" }] });
             
-            // Boutons de notation séparés
-            const row = new ActionRowBuilder().addComponents([1,2,3,4,5].map(n => new ButtonBuilder().setCustomId(`rate_${n}`).setLabel(n.toString()).setStyle(ButtonStyle.Primary)));
-            await i.guild.channels.cache.get(LOG_CHANNEL).send({ content: "⭐ Veuillez noter la prise en charge :", components: [row] });
-            
-            await i.reply("🗑️ Suppression du salon dans 3 secondes...");
+            await i.reply("🗑️ Suppression du salon...");
             setTimeout(() => i.channel.delete(), 3000);
+        }
         }
     }
     // 4. Action Ajout membre & Notation
