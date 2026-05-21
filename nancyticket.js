@@ -90,30 +90,34 @@ client.on("interactionCreate", async (i) => {
     }
 
     // 3. Menu contrôle Staff
+// 3. Menu contrôle Staff
     else if (i.isStringSelectMenu() && i.customId === "ticket_control") {
         if (!i.member.roles.cache.has(STAFF_ROLE)) return i.reply({ ephemeral: true, content: "❌ Réservé aux staffs." });
         const val = i.values[0];
 
-        if (val === "claim") await i.reply(`🧷 Pris en charge par ${i.user}`);
+        if (val === "claim") {
+            await i.reply(`🧷 Pris en charge par ${i.user}`);
+        } 
         else if (val === "lock") {
             await i.channel.permissionOverwrites.edit(LOCK_ROLE, { SendMessages: false });
             await i.reply("🔒 Le rôle cible ne peut plus écrire.");
-        }
+        } 
         else if (val === "add") {
-            const m = new ModalBuilder().setCustomId("m_add").setTitle("Ajout membre").addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("uid").setLabel("ID Discord du membre").setStyle(TextInputStyle.Short).setRequired(true)));
+            const m = new ModalBuilder()
+                .setCustomId("m_add")
+                .setTitle("Ajout membre")
+                .addComponents(new ActionRowBuilder().addComponents(
+                    new TextInputBuilder().setCustomId("uid").setLabel("ID Discord du membre").setStyle(TextInputStyle.Short).setRequired(true)
+                ));
             await i.showModal(m);
-        }
+        } 
         else if (val === "close") {
-            // 1. Récupérer l'utilisateur qui a ouvert le ticket (il est souvent mentionné dans le nom du salon)
-            // Note : Pour être sûr, on peut aussi stocker l'ID de l'auteur au moment de la création
-            // Ici, on récupère le créateur via le nom du salon (format: 🎫・type-username)
             const members = await i.channel.members.fetch();
-            // On cherche l'utilisateur qui n'est pas le bot
             const userToRate = members.find(m => !m.user.bot && m.id !== i.user.id);
 
             if (userToRate) {
                 try {
-                    const row = new ActionRowBuilder().addComponents([1,2,3,4,5].map(n => 
+                    const row = new ActionRowBuilder().addComponents([1, 2, 3, 4, 5].map(n => 
                         new ButtonBuilder().setCustomId(`rate_${n}`).setLabel(n.toString()).setStyle(ButtonStyle.Primary)
                     ));
                     await userToRate.send({ 
@@ -125,14 +129,12 @@ client.on("interactionCreate", async (i) => {
                 }
             }
 
-            // 2. Transcript dans les logs
             const transcript = (await i.channel.messages.fetch({ limit: 100 })).map(m => `[${m.author.tag}]: ${m.content}`).reverse().join("\n");
             await i.guild.channels.cache.get(LOG_CHANNEL).send({ content: "📄 Transcript :", files: [{ attachment: Buffer.from(transcript), name: "transcript.txt" }] });
             
-            await i.reply("🗑️ Suppression du salon...");
+            await i.reply("🗑️ Suppression du salon dans 3 secondes...");
             setTimeout(() => i.channel.delete(), 3000);
-        }
-        }
+        } 
     }
     // 4. Action Ajout membre & Notation
     else if (i.isModalSubmit() && i.customId === "m_add") {
