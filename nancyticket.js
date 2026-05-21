@@ -140,29 +140,4 @@ client.on("interactionCreate", async (i) => {
  
 });
 
-// --- BLOC D'ENVOI DU TICKET (Message de bienvenue en Embed) ---
-
-const embedBienvenue = new EmbedBuilder()
-    .setColor("#5865F2")
-    .setTitle("🟦 Bienvenue sur le support de Nancy RP 🟦")
-    .setDescription(`
-━━━━━━━━━━━━━━━━━━
-
-💙 Merci d’avoir ouvert un ticket !
-
-Un membre du staff prendra votre demande en charge dès que possible.
-
-━━━━━━━━━━━━━━━━━━
-
-**Détails de la demande :**
-${details}`) // 'details' contient les informations du formulaire
-    .setTimestamp();
-
-// Envoi du message dans le salon
-await channel.send({ 
-    content: `${i.user} | <@&${STAFF_ROLE}>`,
-    embeds: [embedBienvenue], 
-    components: [btns] // Tes boutons de gestion (Claim, Lock, etc.)
-});
-
 client.login(process.env.TOKEN);
