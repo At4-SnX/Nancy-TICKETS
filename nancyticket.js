@@ -1,41 +1,62 @@
-require("dotenv").config();
-const { 
-    Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, 
-    StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, 
-    PermissionsBitField, ButtonBuilder, ButtonStyle 
-} = require("discord.js");
-
-const client = new Client({ 
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMembers], 
-    partials: [Partials.Channel] 
-});
-
 // --- CONFIGURATION ---
 const STAFF_ROLE = "1505943612507295826";
-const LOCK_ROLE = "1505943624200884426"; // Le rôle qui sera bloqué
+const LOCK_ROLE = "1505943624200884426";
 const LOG_CHANNEL = "1506375933051932753";
 
-// --- COMMANDE DE PANNEAU (!sendpanel) ---
+// Dictionnaire des catégories (Assure-toi que ces IDs sont bien ceux de CATÉGORIES sur Discord)
+const CAT_IDS = {
+    question: "1506374094906720387",
+    partenariat: "1506374190956281997",
+    reportstaff: "1506374327509979186",
+    reportjoueur: "1506374389137149982",
+    legal: "1505943608832819282",
+    illegal: "1505943610141442129",
+    fondation: "1506374573535268885",
+    prioritaire: "1507131810713305139"
+};
+
+// --- COMMANDE DE PANNEAU ---
 client.on("messageCreate", async (m) => {
     if (m.content === "!sendpanel" && m.member.permissions.has("Administrator")) {
         const menu = new StringSelectMenuBuilder()
             .setCustomId("ticket_menu")
-            .setPlaceholder("🔵 Cliquez ici pour ouvrir une demande")
+            .setPlaceholder("🔵 Choisissez une catégorie")
             .addOptions([
                 { label: "❓ Question", value: "question" },
+                { label: "🤝 Partenariat", value: "partenariat" },
                 { label: "🛡️ Report Staff", value: "reportstaff" },
                 { label: "⚠️ Report Joueur", value: "reportjoueur" },
                 { label: "📘 Demande Légal", value: "legal" },
                 { label: "📕 Demande Illégal", value: "illegal" },
                 { label: "🏛️ Fondation", value: "fondation" },
-                { label: "🚨 Prioritaire", value: "prioritaire" }
+                { label: "🚨 Demande Unban", value: "prioritaire" }
             ]);
         await m.channel.send({ 
-            content: "🎫 **Centre d'assistance Nancy RP**\nChoisissez la catégorie correspondant à votre demande :", 
+            content: "🎫 **Centre d'assistance Nancy RP**", 
             components: [new ActionRowBuilder().addComponents(menu)] 
         });
         await m.delete();
     }
+});
+
+// --- LOGIQUE DE CRÉATION DANS LA BONNE CATÉGORIE ---
+client.on("interactionCreate", async (i) => {
+    if (!i.isModalSubmit() || !i.customId.startsWith("modal_")) return;
+
+    const type = i.customId.split("_")[1];
+    const categoryId = CAT_IDS[type]; // Récupère l'ID correspondant au choix
+
+    const channel = await i.guild.channels.create({
+        name: `🎫・${type}-${i.user.username}`,
+        parent: categoryId, // <--- C'est ici que le ticket est rangé dans la catégorie
+        permissionOverwrites: [
+            { id: i.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+            { id: i.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] },
+            { id: STAFF_ROLE, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages] }
+        ]
+    });
+    
+    await i.reply({ content: `✅ Ticket créé : ${channel}`, ephemeral: true });
 });
 
 // --- FONCTION FORMULAIRE ---
@@ -117,6 +138,31 @@ client.on("interactionCreate", async (i) => {
         }
     }
  
+});
+
+// --- BLOC D'ENVOI DU TICKET (Message de bienvenue en Embed) ---
+
+const embedBienvenue = new EmbedBuilder()
+    .setColor("#5865F2")
+    .setTitle("🟦 Bienvenue sur le support de Nancy RP 🟦")
+    .setDescription(`
+━━━━━━━━━━━━━━━━━━
+
+💙 Merci d’avoir ouvert un ticket !
+
+Un membre du staff prendra votre demande en charge dès que possible.
+
+━━━━━━━━━━━━━━━━━━
+
+**Détails de la demande :**
+${details}`) // 'details' contient les informations du formulaire
+    .setTimestamp();
+
+// Envoi du message dans le salon
+await channel.send({ 
+    content: `${i.user} | <@&${STAFF_ROLE}>`,
+    embeds: [embedBienvenue], 
+    components: [btns] // Tes boutons de gestion (Claim, Lock, etc.)
 });
 
 client.login(process.env.TOKEN);
