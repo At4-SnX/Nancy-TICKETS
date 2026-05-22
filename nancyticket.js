@@ -29,7 +29,6 @@ const TOKEN = process.env.TOKEN;
 const THEME_COLOR = "#5865F2";
 
 const STAFF_ROLE = "1505943612507295826";
-const LOCK_ROLE = "1505943624200884426";
 const LOG_CHANNEL = "1506375933051932753";
 
 // rôles de ping spéciaux
@@ -114,7 +113,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ─────────────────────────────────────────────
-// INTERACTIONS — PARTIE 1
+// INTERACTIONS
 // ─────────────────────────────────────────────
 
 client.on("interactionCreate", async (interaction) => {
@@ -416,13 +415,14 @@ client.on("interactionCreate", async (interaction) => {
 
       // Lock
       if (action === "lock") {
-        if (!member.roles.cache.has(LOCK_ROLE) && !member.roles.cache.has(STAFF_ROLE)) {
+        if (!member.roles.cache.has(STAFF_ROLE)) {
           const embed = new EmbedBuilder()
             .setColor(THEME_COLOR)
             .setDescription("❌ Tu n'as pas la permission de lock ce ticket.");
           return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
+        // On retrouve l'utilisateur à partir du nom du salon
         const parts = channel.name.split("-");
         const userName = parts.slice(1).join("-");
         const guildMember = channel.guild.members.cache.find(
@@ -573,12 +573,14 @@ client.on("interactionCreate", async (interaction) => {
   } catch (err) {
     console.error("Erreur interaction :", err);
 
-    if (interaction.isRepliable && !interaction.replied && !interaction.deferred) {
-      const embed = new EmbedBuilder()
-        .setColor(THEME_COLOR)
-        .setDescription("❌ Une erreur est survenue.");
-      interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => {});
-    }
+    try {
+      if ("reply" in interaction && !interaction.replied && !interaction.deferred) {
+        const embed = new EmbedBuilder()
+          .setColor(THEME_COLOR)
+          .setDescription("❌ Une erreur est survenue.");
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+    } catch (_) {}
   }
 });
 
