@@ -114,7 +114,7 @@ client.on("messageCreate", async (message) => {
 });
 
 // ─────────────────────────────────────────────
-// INTERACTIONS
+// INTERACTIONS — PARTIE 1
 // ─────────────────────────────────────────────
 
 client.on("interactionCreate", async (interaction) => {
@@ -260,6 +260,7 @@ client.on("interactionCreate", async (interaction) => {
       let type = interaction.customId.replace("ticket_form_", "");
       let reportedStaffId = null;
 
+      // cas spécial report staff
       if (type.startsWith("reportstaff_")) {
         reportedStaffId = type.split("_")[1];
         type = "reportstaff";
@@ -267,6 +268,7 @@ client.on("interactionCreate", async (interaction) => {
 
       const categoryId = CATEGORY_IDS[type];
 
+      // Vérifier si un ticket existe déjà
       const existing = interaction.guild.channels.cache.find(
         c => c.name.includes(interaction.user.username)
       );
@@ -277,6 +279,7 @@ client.on("interactionCreate", async (interaction) => {
         return interaction.reply({ embeds: [embed], ephemeral: true });
       }
 
+      // ───────── DESCRIPTION DU TICKET ─────────
       let description;
 
       if (type === "reportjoueur") {
@@ -308,6 +311,7 @@ client.on("interactionCreate", async (interaction) => {
           `**Détails :**\n${interaction.fields.getTextInputValue("ticket_details")}`;
       }
 
+      // ───────── PERMISSIONS DU TICKET ─────────
       const overwrites = [
         { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
         {
@@ -328,6 +332,7 @@ client.on("interactionCreate", async (interaction) => {
         }
       ];
 
+      // Exclure le staff reporté
       if (reportedStaffId) {
         overwrites.push({
           id: reportedStaffId,
@@ -339,10 +344,12 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
+      // ───────── NOM DU SALON ─────────
       const catLabel = CATEGORY_LABELS_FR[type];
       const safeUser = interaction.user.username.replace(/[^a-zA-Z0-9-_]/g, "");
       const channelName = `・🎫・${catLabel}-${safeUser}`;
 
+      // ───────── CRÉATION DU SALON ─────────
       const channel = await interaction.guild.channels.create({
         name: channelName,
         type: ChannelType.GuildText,
@@ -350,6 +357,7 @@ client.on("interactionCreate", async (interaction) => {
         permissionOverwrites: overwrites
       });
 
+      // ───────── EMBED DU TICKET ─────────
       const embedTicket = new EmbedBuilder()
         .setColor(THEME_COLOR)
         .setTitle("🟦 Bienvenue sur le support de Nancy RP 🟦")
@@ -357,6 +365,7 @@ client.on("interactionCreate", async (interaction) => {
         .setFooter({ text: "Nancy TICKET — Support" })
         .setTimestamp();
 
+      // ───────── MENU D’ACTIONS ─────────
       const controlMenu = new StringSelectMenuBuilder()
         .setCustomId("ticket_controls")
         .setPlaceholder("⚙️ Actions du ticket")
@@ -368,14 +377,17 @@ client.on("interactionCreate", async (interaction) => {
           { label: "🗑️ Fermer", value: "close" }
         ]);
 
+      // rôle à ping selon le type
       const pingRole = PING_ROLES[type] || PING_ROLES.default;
 
+      // ───────── ENVOI DU TICKET ─────────
       await channel.send({
         content: `<@&${pingRole}> <@${interaction.user.id}>`,
         embeds: [embedTicket],
         components: [new ActionRowBuilder().addComponents(controlMenu)]
       });
 
+      // Réponse au créateur
       const embedReply = new EmbedBuilder()
         .setColor(THEME_COLOR)
         .setDescription(`🎫 Ton ticket a été créé : ${channel}`);
@@ -413,7 +425,9 @@ client.on("interactionCreate", async (interaction) => {
 
         const parts = channel.name.split("-");
         const userName = parts.slice(1).join("-");
-        const guildMember = channel.guild.members.cache.find(m => m.user.username.replace(/[^a-zA-Z0-9-_]/g, "") === userName);
+        const guildMember = channel.guild.members.cache.find(
+          m => m.user.username.replace(/[^a-zA-Z0-9-_]/g, "") === userName
+        );
 
         if (guildMember) {
           await channel.permissionOverwrites.edit(guildMember.id, { SendMessages: false });
@@ -483,4 +497,96 @@ client.on("interactionCreate", async (interaction) => {
 
     // ───────── MODAL : AJOUT D’UN MEMBRE ─────────
     if (interaction.isModalSubmit() && interaction.customId === "add_user_modal") {
-      const userId = interaction.fields.getTextInputValue("
+
+      const userId = interaction.fields.getTextInputValue("user_id");
+
+      try {
+        await interaction.channel.permissionOverwrites.edit(userId, {
+          ViewChannel: true,
+          SendMessages: true,
+          ReadMessageHistory: true
+        });
+
+        const embed = new EmbedBuilder()
+          .setColor(THEME_COLOR)
+          .setDescription(`➕ <@${userId}> a été ajouté au ticket.`);
+        return interaction.reply({ embeds: [embed] });
+
+      } catch (err) {
+        const embed = new EmbedBuilder()
+          .setColor(THEME_COLOR)
+          .setDescription("❌ Impossible d’ajouter ce membre. Vérifie l’ID.");
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+    }
+
+    // ───────── BOUTONS : FERMETURE DU TICKET ─────────
+    if (interaction.isButton()) {
+
+      // Annuler fermeture
+      if (interaction.customId === "cancel_close") {
+        const embed = new EmbedBuilder()
+          .setColor(THEME_COLOR)
+          .setDescription("❌ Fermeture annulée.");
+        return interaction.update({ embeds: [embed], components: [] });
+      }
+
+      // Confirmer fermeture
+      if (interaction.customId === "confirm_close") {
+
+        const embedInfo = new EmbedBuilder()
+          .setColor(THEME_COLOR)
+          .setDescription("🗑️ Fermeture du ticket dans 2 secondes…");
+
+        await interaction.update({ embeds: [embedInfo], components: [] });
+
+        // Transcript
+        const messages = await interaction.channel.messages.fetch({ limit: 100 });
+        const transcript = messages
+          .reverse()
+          .map(m => `${m.createdAt.toISOString()} | ${m.author.tag}: ${m.content}`)
+          .join("\n");
+
+        const fileName = `transcript-${interaction.channel.id}.txt`;
+        fs.writeFileSync(fileName, transcript || "Aucun message dans ce ticket.");
+
+        const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL);
+        if (logChannel) {
+          const embedLog = new EmbedBuilder()
+            .setColor(THEME_COLOR)
+            .setDescription(`📄 Transcript du ticket **${interaction.channel.name}**`);
+
+          await logChannel.send({
+            embeds: [embedLog],
+            files: [fileName]
+          });
+        }
+
+        // Suppression du salon
+        setTimeout(() => {
+          interaction.channel.delete().catch(() => {});
+          fs.unlink(fileName, () => {});
+        }, 2000);
+      }
+    }
+
+  } catch (err) {
+    console.error("Erreur interaction :", err);
+
+    if (interaction.isRepliable && !interaction.replied && !interaction.deferred) {
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setDescription("❌ Une erreur est survenue.");
+      interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => {});
+    }
+  }
+});
+
+// ─────────────────────────────────────────────
+// LOGIN
+// ─────────────────────────────────────────────
+
+client.login(TOKEN).catch(err => {
+  console.error("Erreur de connexion :", err);
+  process.exit(1);
+});
