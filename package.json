@@ -1,10 +1,13 @@
 {
-  "name": "nancy-assistance",
+  "name": "nancy-ticket",
   "version": "1.0.0",
-  "description": "Bot de tickets complet pour Nancy RP",
+  "description": "Bot de tickets pour Nancy RP — Discord.js v14",
   "main": "nancyticket.js",
   "scripts": {
     "start": "node nancyticket.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
