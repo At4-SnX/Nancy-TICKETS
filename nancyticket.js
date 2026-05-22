@@ -123,12 +123,18 @@ client.on("messageCreate", async (message) => {
 
 client.on("interactionCreate", async (interaction) => {
   try {
+
     // ───────── MENU PRINCIPAL → MODAL OU SOUS-MENU ─────────
     if (interaction.isStringSelectMenu() && interaction.customId === "ticket_menu") {
       const type = interaction.values[0];
 
-      // cas spécial : report staff → choisir le staff à reporter
+      // ───────── REPORT STAFF : CHOIX DU STAFF À REPORTER ─────────
       if (type === "reportstaff") {
+
+        // Mise à jour du cache pour récupérer TOUS les membres
+        await interaction.guild.members.fetch();
+
+        // Récupération de tous les staffs (sauf bots)
         const staffMembers = interaction.guild.members.cache
           .filter(m => m.roles.cache.has(STAFF_ROLE) && !m.user.bot);
 
@@ -160,7 +166,7 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
-      // autres types → modal direct
+      // ───────── AUTRES TYPES : OUVERTURE DU MODAL DIRECT ─────────
       const modal = new ModalBuilder()
         .setCustomId(`ticket_form_${type}`)
         .setTitle("🎫 Création d’un ticket");
@@ -189,7 +195,9 @@ client.on("interactionCreate", async (interaction) => {
               .setRequired(false)
           )
         );
-      } else if (type === "unban") {
+      }
+
+      else if (type === "unban") {
         modal.addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
@@ -206,7 +214,9 @@ client.on("interactionCreate", async (interaction) => {
               .setRequired(true)
           )
         );
-      } else {
+      }
+
+      else {
         modal.addComponents(
           new ActionRowBuilder().addComponents(
             new TextInputBuilder()
@@ -223,6 +233,7 @@ client.on("interactionCreate", async (interaction) => {
 
     // ───────── SOUS-MENU : CHOIX DU STAFF À REPORTER ─────────
     if (interaction.isStringSelectMenu() && interaction.customId === "select_report_staff") {
+
       const staffId = interaction.values[0];
 
       const modal = new ModalBuilder()
@@ -248,6 +259,47 @@ client.on("interactionCreate", async (interaction) => {
 
       return interaction.showModal(modal);
     }
+
+    // (le reste de ton code continue ici…)
+
+  } catch (err) {
+    console.error("Erreur interaction :", err);
+  }
+});
+
+
+  // ───────── SOUS-MENU : CHOIX DU STAFF À REPORTER ─────────
+if (interaction.isStringSelectMenu() && interaction.customId === "select_report_staff") {
+
+    // Mise à jour du cache pour récupérer TOUS les membres
+    await interaction.guild.members.fetch();
+
+    const staffId = interaction.values[0];
+
+    const modal = new ModalBuilder()
+        .setCustomId(`ticket_form_reportstaff_${staffId}`)
+        .setTitle("🛡️ Report Staff");
+
+    modal.addComponents(
+        new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+                .setCustomId("ticket_raison")
+                .setLabel("Raison du report")
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(true)
+        ),
+        new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+                .setCustomId("ticket_preuve")
+                .setLabel("Preuve (facultatif)")
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(false)
+        )
+    );
+
+    return interaction.showModal(modal);
+}
+
 
     // ───────── MODALS → CRÉATION DES TICKETS ─────────
     if (interaction.isModalSubmit() && interaction.customId.startsWith("ticket_form_")) {
