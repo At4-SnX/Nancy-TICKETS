@@ -25,10 +25,6 @@ const fs = require("fs");
 // ─────────────────────────────────────────────
 
 const TOKEN = process.env.TOKEN;
-if (!TOKEN) {
-  console.error("❌ TOKEN manquant dans le fichier .env");
-  process.exit(1);
-}
 
 const STAFF_ROLE = "1505943612507295826";
 const LOCK_ROLE = "1505943624200884426";
@@ -41,7 +37,8 @@ const CATEGORY_IDS = {
   reportjoueur: "1506374389137149982",
   legal: "1505943608832819282",
   illegal: "1505943610141442129",
-  fondation: "1506374573535268885"
+  fondation: "1506374573535268885",
+  unban: "1506374094906720387" // tu peux changer si tu veux une autre catégorie
 };
 
 const THEME_COLOR = "#5865F2";
@@ -65,40 +62,37 @@ const client = new Client({
 // ─────────────────────────────────────────────
 
 client.once("ready", () => {
-  console.log(`✅ Connecté en tant que ${client.user.tag} (Nancy TICKET)`);
+  console.log(`✅ Nancy TICKET lancé en tant que ${client.user.tag}`);
 });
 
 // ─────────────────────────────────────────────
-// PANEL : !sendpanel (ADMIN ONLY) — MENU UNIQUEMENT
+// PANEL : !sendpanel (ADMIN ONLY)
 // ─────────────────────────────────────────────
 
 client.on("messageCreate", async (message) => {
-  try {
-    if (message.author.bot) return;
-    if (message.content !== "!sendpanel") return;
-    if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
+  if (message.author.bot) return;
+  if (message.content !== "!sendpanel") return;
+  if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) return;
 
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId("ticket_menu")
-      .setPlaceholder("📂 Choisissez une catégorie de ticket")
-      .addOptions([
-        { label: "Question", value: "question", emoji: "❓", description: "Poser une question au staff" },
-        { label: "Partenariat", value: "partenariat", emoji: "🤝", description: "Demande de partenariat" },
-        { label: "Report Staff", value: "reportstaff", emoji: "🛡️", description: "Signaler un membre du staff" },
-        { label: "Report Joueur", value: "reportjoueur", emoji: "⚠️", description: "Signaler un joueur" },
-        { label: "Demande Légal", value: "legal", emoji: "📘", description: "Demande liée au RP légal" },
-        { label: "Demande Illégal", value: "illegal", emoji: "📕", description: "Demande liée au RP illégal" },
-        { label: "Fondation", value: "fondation", emoji: "🏛️", description: "Demande liée à la fondation" }
-      ]);
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId("ticket_menu")
+    .setPlaceholder("📂 Choisissez une catégorie de ticket")
+    .addOptions([
+      { label: "Question", value: "question", emoji: "❓" },
+      { label: "Partenariat", value: "partenariat", emoji: "🤝" },
+      { label: "Report Staff", value: "reportstaff", emoji: "🛡️" },
+      { label: "Report Joueur", value: "reportjoueur", emoji: "⚠️" },
+      { label: "Demande Légal", value: "legal", emoji: "📘" },
+      { label: "Demande Illégal", value: "illegal", emoji: "📕" },
+      { label: "Fondation", value: "fondation", emoji: "🏛️" },
+      { label: "Demande d’unban", value: "unban", emoji: "🔓" }
+    ]);
 
-    await message.channel.send({
-      components: [new ActionRowBuilder().addComponents(menu)]
-    });
+  await message.channel.send({
+    components: [new ActionRowBuilder().addComponents(menu)]
+  });
 
-    await message.delete().catch(() => {});
-  } catch (err) {
-    console.error("Erreur !sendpanel :", err);
-  }
+  await message.delete().catch(() => {});
 });
 
 // ─────────────────────────────────────────────
@@ -107,7 +101,7 @@ client.on("messageCreate", async (message) => {
 
 client.on("interactionCreate", async (interaction) => {
   try {
-    // ───────────── MENU DE TICKET → OUVERTURE MODAL ─────────────
+    // ───────────── MENU → MODAL ─────────────
     if (interaction.isStringSelectMenu() && interaction.customId === "ticket_menu") {
       const type = interaction.values[0];
 
@@ -116,58 +110,73 @@ client.on("interactionCreate", async (interaction) => {
         .setTitle("🎫 Création d’un ticket");
 
       if (type === "reportjoueur") {
-        const joueur = new TextInputBuilder()
-          .setCustomId("ticket_joueur")
-          .setLabel("Nom du joueur")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true);
-
-        const raison = new TextInputBuilder()
-          .setCustomId("ticket_raison")
-          .setLabel("Raison du report")
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true);
-
-        const preuve = new TextInputBuilder()
-          .setCustomId("ticket_preuve")
-          .setLabel("Preuve (lien / explication)")
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(false);
-
         modal.addComponents(
-          new ActionRowBuilder().addComponents(joueur),
-          new ActionRowBuilder().addComponents(raison),
-          new ActionRowBuilder().addComponents(preuve)
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("ticket_joueur")
+              .setLabel("Nom du joueur")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("ticket_raison")
+              .setLabel("Raison du report")
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("ticket_preuve")
+              .setLabel("Preuve (facultatif)")
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(false)
+          )
         );
-      } else {
-        const details = new TextInputBuilder()
-          .setCustomId("ticket_details")
-          .setLabel("Détails de la demande")
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true);
+      }
 
+      else if (type === "unban") {
         modal.addComponents(
-          new ActionRowBuilder().addComponents(details)
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("ticket_unban_nom")
+              .setLabel("Nom RP / Discord")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          ),
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("ticket_unban_raison")
+              .setLabel("Pourquoi devrions-nous te déban ?")
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(true)
+          )
+        );
+      }
+
+      else {
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("ticket_details")
+              .setLabel("Détails de la demande")
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(true)
+          )
         );
       }
 
       return interaction.showModal(modal);
     }
 
-    // ───────────── MODAL → CRÉATION DU SALON DE TICKET ─────────────
+    // ───────────── MODAL → CRÉATION DU TICKET ─────────────
     if (interaction.isModalSubmit() && interaction.customId.startsWith("ticket_form_")) {
       const type = interaction.customId.replace("ticket_form_", "");
 
       const categoryId = CATEGORY_IDS[type];
-      if (!categoryId) {
-        return interaction.reply({ content: "❌ Catégorie de ticket invalide.", ephemeral: true });
-      }
 
-      // Vérifier si un ticket existe déjà pour cet utilisateur
       const existing = interaction.guild.channels.cache.find(
-        (c) =>
-          c.type === ChannelType.GuildText &&
-          c.name === `ticket-${interaction.user.id}`
+        (c) => c.name === `ticket-${interaction.user.id}`
       );
 
       if (existing) {
@@ -178,95 +187,62 @@ client.on("interactionCreate", async (interaction) => {
       }
 
       let description = "";
-      let fieldsText = "";
 
       if (type === "reportjoueur") {
-        const joueur = interaction.fields.getTextInputValue("ticket_joueur");
-        const raison = interaction.fields.getTextInputValue("ticket_raison");
-        const preuve = interaction.fields.getTextInputValue("ticket_preuve") || "Aucune preuve fournie.";
-
         description =
-          `**Type :** Report Joueur\n` +
-          `**Joueur :** ${joueur}\n` +
-          `**Raison :** ${raison}\n` +
-          `**Preuve :** ${preuve}`;
-
-        fieldsText = description;
-      } else {
-        const details = interaction.fields.getTextInputValue("ticket_details");
-        description =
-          `**Type :** ${type}\n` +
-          `**Détails :**\n${details}`;
-        fieldsText = description;
+          `**Type : Report Joueur**\n` +
+          `**Joueur :** ${interaction.fields.getTextInputValue("ticket_joueur")}\n` +
+          `**Raison :** ${interaction.fields.getTextInputValue("ticket_raison")}\n` +
+          `**Preuve :** ${interaction.fields.getTextInputValue("ticket_preuve") || "Aucune"}`;
       }
 
-      // Création du salon
+      else if (type === "unban") {
+        description =
+          `**Type : Demande d’unban**\n` +
+          `**Nom :** ${interaction.fields.getTextInputValue("ticket_unban_nom")}\n` +
+          `**Raison :** ${interaction.fields.getTextInputValue("ticket_unban_raison")}`;
+      }
+
+      else {
+        description =
+          `**Type : ${type}**\n` +
+          `**Détails :**\n${interaction.fields.getTextInputValue("ticket_details")}`;
+      }
+
       const channel = await interaction.guild.channels.create({
         name: `ticket-${interaction.user.id}`,
         type: ChannelType.GuildText,
         parent: categoryId,
         permissionOverwrites: [
-          {
-            id: interaction.guild.id,
-            deny: [PermissionFlagsBits.ViewChannel]
-          },
-          {
-            id: interaction.user.id,
-            allow: [
-              PermissionFlagsBits.ViewChannel,
-              PermissionFlagsBits.SendMessages,
-              PermissionFlagsBits.ReadMessageHistory
-            ]
-          },
-          {
-            id: STAFF_ROLE,
-            allow: [
-              PermissionFlagsBits.ViewChannel,
-              PermissionFlagsBits.SendMessages,
-              PermissionFlagsBits.ReadMessageHistory
-            ]
-          }
+          { id: interaction.guild.id, deny: [PermissionFlagsBits.ViewChannel] },
+          { id: interaction.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+          { id: STAFF_ROLE, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] }
         ]
       });
 
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
         .setTitle("🟦 Bienvenue sur le support de Nancy RP 🟦")
-        .setDescription(
-          `${fieldsText}\n\n` +
-          "Un membre du staff va bientôt te répondre.\n" +
-          "Merci de rester courtois et de fournir toutes les informations nécessaires."
-        )
-        .setFooter({ text: "Nancy TICKET — Système de support" })
+        .setDescription(description)
+        .setFooter({ text: "Nancy TICKET — Support" })
         .setTimestamp();
 
-      const buttons = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId("btn_claim")
-          .setLabel("Claim")
-          .setStyle(ButtonStyle.Primary)
-          .setEmoji("🧷"),
-        new ButtonBuilder()
-          .setCustomId("btn_lock")
-          .setLabel("Lock")
-          .setStyle(ButtonStyle.Secondary)
-          .setEmoji("🔒"),
-        new ButtonBuilder()
-          .setCustomId("btn_call")
-          .setLabel("Appel Staff")
-          .setStyle(ButtonStyle.Success)
-          .setEmoji("🔔"),
-        new ButtonBuilder()
-          .setCustomId("btn_close")
-          .setLabel("Fermer")
-          .setStyle(ButtonStyle.Danger)
-          .setEmoji("🗑️")
-      );
+      // ───────────── MENUS DE BOUTONS (SelectMenu) ─────────────
+      const controlMenu = new StringSelectMenuBuilder()
+        .setCustomId("ticket_controls")
+        .setPlaceholder("⚙️ Actions du ticket")
+        .addOptions([
+          { label: "🧷 Claim", value: "claim" },
+          { label: "🔒 Lock", value: "lock" },
+          { label: "🔔 Appel Staff", value: "call" },
+          { label: "➕ Ajouter un membre", value: "adduser" },
+          { label: "🗑️ Fermer", value: "close" }
+        ]);
 
       await channel.send({
         content: `<@${interaction.user.id}> <@&${STAFF_ROLE}>`,
         embeds: [embed],
-        components: [buttons]
+        components: [new ActionRowBuilder().addComponents(controlMenu)]
       });
 
       return interaction.reply({
@@ -275,117 +251,113 @@ client.on("interactionCreate", async (interaction) => {
       });
     }
 
-    // ───────────── BOUTONS DE GESTION DU TICKET ─────────────
-    if (interaction.isButton()) {
-      const { customId, channel, guild, user, member } = interaction;
+    // ───────────── MENU DE CONTRÔLE DU TICKET ─────────────
+    if (interaction.isStringSelectMenu() && interaction.customId === "ticket_controls") {
+      const action = interaction.values[0];
+      const channel = interaction.channel;
+      const member = interaction.member;
 
       // Claim
-      if (customId === "btn_claim") {
+      if (action === "claim") {
         if (!member.roles.cache.has(STAFF_ROLE)) {
-          return interaction.reply({ content: "❌ Tu dois être staff pour claim ce ticket.", ephemeral: true });
+          return interaction.reply({ content: "❌ Tu n'es pas staff.", ephemeral: true });
         }
-
-        return interaction.reply({
-          content: `🧷 Ticket pris en charge par <@${user.id}>.`,
-          ephemeral: false
-        });
+        return interaction.reply(`🧷 Ticket pris en charge par <@${interaction.user.id}>`);
       }
 
       // Lock
-      if (customId === "btn_lock") {
-        if (!member.roles.cache.has(LOCK_ROLE) && !member.roles.cache.has(STAFF_ROLE)) {
-          return interaction.reply({ content: "❌ Tu n'as pas la permission de lock ce ticket.", ephemeral: true });
-        }
-
-        const ticketOwnerId = channel.name.startsWith("ticket-")
-          ? channel.name.replace("ticket-", "")
-          : null;
-
-        if (ticketOwnerId) {
-          await channel.permissionOverwrites.edit(ticketOwnerId, {
-            SendMessages: false
-          });
-        }
-
-        return interaction.reply("🔒 Le ticket a été verrouillé pour l'utilisateur.");
+      if (action === "lock") {
+        const ownerId = channel.name.replace("ticket-", "");
+        await channel.permissionOverwrites.edit(ownerId, { SendMessages: false });
+        return interaction.reply("🔒 Ticket verrouillé.");
       }
 
       // Appel Staff
-      if (customId === "btn_call") {
-        return interaction.reply({
-          content: `<@&${STAFF_ROLE}> 🔔 Un staff est demandé sur ce ticket.`,
-          ephemeral: false
-        });
+      if (action === "call") {
+        return interaction.reply(`<@&${STAFF_ROLE}> 🔔 Un staff est demandé ici.`);
       }
 
-      // Fermer → Confirmation
-      if (customId === "btn_close") {
-        if (!member.roles.cache.has(STAFF_ROLE)) {
-          return interaction.reply({ content: "❌ Tu dois être staff pour fermer ce ticket.", ephemeral: true });
-        }
+      // Ajouter un membre
+      if (action === "adduser") {
+        const modal = new ModalBuilder()
+          .setCustomId("add_user_modal")
+          .setTitle("➕ Ajouter un membre");
 
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId("confirm_close")
-            .setLabel("Confirmer la fermeture")
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji("⚠️"),
-          new ButtonBuilder()
-            .setCustomId("cancel_close")
-            .setLabel("Annuler")
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji("❌")
+        modal.addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId("user_id")
+              .setLabel("ID du membre à ajouter")
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+          )
         );
 
+        return interaction.showModal(modal);
+      }
+
+      // Fermer
+      if (action === "close") {
         return interaction.reply({
-          content: "⚠️ Es-tu sûr de vouloir fermer ce ticket ?",
-          components: [row]
+          content: "⚠️ Confirmer la fermeture ?",
+          components: [
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setCustomId("confirm_close").setLabel("Confirmer").setStyle(ButtonStyle.Danger),
+              new ButtonBuilder().setCustomId("cancel_close").setLabel("Annuler").setStyle(ButtonStyle.Secondary)
+            )
+          ]
         });
       }
+    }
 
-      // Annuler fermeture
-      if (customId === "cancel_close") {
-        return interaction.update({
-          content: "❌ Fermeture annulée.",
-          components: []
+    // ───────────── AJOUT D’UN MEMBRE ─────────────
+    if (interaction.isModalSubmit() && interaction.customId === "add_user_modal") {
+      const userId = interaction.fields.getTextInputValue("user_id");
+
+      try {
+        await interaction.channel.permissionOverwrites.edit(userId, {
+          ViewChannel: true,
+          SendMessages: true
         });
+
+        return interaction.reply(`➕ <@${userId}> a été ajouté au ticket.`);
+      } catch {
+        return interaction.reply({ content: "❌ ID invalide.", ephemeral: true });
+      }
+    }
+
+    // ───────────── FERMETURE DU TICKET ─────────────
+    if (interaction.isButton()) {
+      if (interaction.customId === "cancel_close") {
+        return interaction.update({ content: "❌ Fermeture annulée.", components: [] });
       }
 
-      // Confirmer fermeture → transcript + logs + delete
-      if (customId === "confirm_close") {
-        await interaction.update({
-          content: "🗑️ Fermeture du ticket dans 2 secondes…",
-          components: []
-        });
+      if (interaction.customId === "confirm_close") {
+        await interaction.update({ content: "🗑️ Fermeture dans 2 secondes…", components: [] });
 
-        const messages = await channel.messages.fetch({ limit: 100 });
-        const transcript = messages
-          .reverse()
-          .map((m) => `${m.createdAt.toISOString()} | ${m.author.tag}: ${m.content}`)
-          .join("\n");
+        const messages = await interaction.channel.messages.fetch({ limit: 100 });
+        const transcript = messages.reverse().map(m => `${m.author.tag}: ${m.content}`).join("\n");
 
-        const fileName = `transcript-${channel.id}.txt`;
-        fs.writeFileSync(fileName, transcript || "Aucun message dans ce ticket.");
+        const fileName = `transcript-${interaction.channel.id}.txt`;
+        fs.writeFileSync(fileName, transcript);
 
-        const logChannel = guild.channels.cache.get(LOG_CHANNEL);
+        const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL);
         if (logChannel) {
           await logChannel.send({
-            content: `📄 Transcript du ticket **${channel.name}**`,
+            content: `📄 Transcript du ticket **${interaction.channel.name}**`,
             files: [fileName]
           });
         }
 
         setTimeout(() => {
-          channel.delete().catch(() => {});
+          interaction.channel.delete().catch(() => {});
           fs.unlink(fileName, () => {});
         }, 2000);
       }
     }
+
   } catch (err) {
-    console.error("Erreur interactionCreate :", err);
-    if (interaction.isRepliable && !interaction.replied && !interaction.deferred) {
-      interaction.reply({ content: "❌ Une erreur est survenue.", ephemeral: true }).catch(() => {});
-    }
+    console.error("Erreur :", err);
   }
 });
 
@@ -393,7 +365,4 @@ client.on("interactionCreate", async (interaction) => {
 // LOGIN
 // ─────────────────────────────────────────────
 
-client.login(TOKEN).catch((err) => {
-  console.error("Erreur de connexion :", err);
-  process.exit(1);
-});
+client.login(TOKEN);
