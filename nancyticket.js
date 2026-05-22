@@ -393,132 +393,157 @@ client.on("interactionCreate", async (interaction) => {
       return interaction.reply({ embeds: [embedReply], ephemeral: true });
     }
 
-    // ───────── MENU DE CONTRÔLE DU TICKET ─────────
-    if (interaction.isStringSelectMenu() && interaction.customId === "ticket_controls") {
-      const action = interaction.values[0];
-      const channel = interaction.channel;
-      const member = interaction.member;
+  // ───────── MENU DE CONTRÔLE DU TICKET ─────────
+if (interaction.isStringSelectMenu() && interaction.customId === "ticket_controls") {
+  const action = interaction.values[0];
+  const channel = interaction.channel;
+  const member = interaction.member;
 
-      // Claim
-      if (action === "claim") {
-        if (!member.roles.cache.has(STAFF_ROLE)) {
-          const embed = new EmbedBuilder()
-            .setColor(THEME_COLOR)
-            .setDescription("❌ Tu n'es pas staff.");
-          return interaction.reply({ embeds: [embed], ephemeral: true });
-        }
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription(`🧷 Ticket pris en charge par <@${interaction.user.id}>.`);
-        return interaction.reply({ embeds: [embed] });
-      }
+  // Initialisation du flag d'appel staff
+  if (channel.callStaffUsed === undefined) {
+    channel.callStaffUsed = false;
+  }
 
-      // Lock
-      if (action === "lock") {
-        if (!member.roles.cache.has(STAFF_ROLE)) {
-          const embed = new EmbedBuilder()
-            .setColor(THEME_COLOR)
-            .setDescription("❌ Tu n'as pas la permission de lock ce ticket.");
-          return interaction.reply({ embeds: [embed], ephemeral: true });
-        }
-
-        // On retrouve l'utilisateur à partir du nom du salon
-        const parts = channel.name.split("-");
-        const userName = parts.slice(1).join("-");
-        const guildMember = channel.guild.members.cache.find(
-          m => m.user.username.replace(/[^a-zA-Z0-9-_]/g, "") === userName
-        );
-
-        if (guildMember) {
-          await channel.permissionOverwrites.edit(guildMember.id, { SendMessages: false });
-        }
-
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription("🔒 Ticket verrouillé pour l'utilisateur.");
-        return interaction.reply({ embeds: [embed] });
-      }
-
-      // Appel Staff
-      if (action === "call") {
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription(`<@&${STAFF_ROLE}> 🔔 Un staff est demandé sur ce ticket.`);
-        return interaction.reply({ embeds: [embed] });
-      }
-
-      // Ajouter un membre
-      if (action === "adduser") {
-        const modal = new ModalBuilder()
-          .setCustomId("add_user_modal")
-          .setTitle("➕ Ajouter un membre au ticket");
-
-        modal.addComponents(
-          new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId("user_id")
-              .setLabel("ID du membre à ajouter")
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true)
-          )
-        );
-
-        return interaction.showModal(modal);
-      }
-
-      // Fermer
-      if (action === "close") {
-        if (!member.roles.cache.has(STAFF_ROLE)) {
-          const embed = new EmbedBuilder()
-            .setColor(THEME_COLOR)
-            .setDescription("❌ Tu dois être staff pour fermer ce ticket.");
-          return interaction.reply({ embeds: [embed], ephemeral: true });
-        }
-
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId("confirm_close")
-            .setLabel("Confirmer")
-            .setStyle(ButtonStyle.Danger)
-            .setEmoji("⚠️"),
-          new ButtonBuilder()
-            .setCustomId("cancel_close")
-            .setLabel("Annuler")
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji("❌")
-        );
-
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription("⚠️ Es-tu sûr de vouloir fermer ce ticket ?");
-        return interaction.reply({ embeds: [embed], components: [row] });
-      }
+  // ───────── CLAIM ─────────
+  if (action === "claim") {
+    if (!member.roles.cache.has(STAFF_ROLE)) {
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setDescription("❌ Tu n'es pas staff.");
+      return interaction.reply({ embeds: [embed], ephemeral: true });
     }
 
-    // ───────── MODAL : AJOUT D’UN MEMBRE ─────────
-    if (interaction.isModalSubmit() && interaction.customId === "add_user_modal") {
+    const embed = new EmbedBuilder()
+      .setColor(THEME_COLOR)
+      .setDescription(`🧷 Ticket pris en charge par <@${interaction.user.id}>.`);
+    return interaction.reply({ embeds: [embed] });
+  }
 
-      const userId = interaction.fields.getTextInputValue("user_id");
-
-      try {
-        await interaction.channel.permissionOverwrites.edit(userId, {
-          ViewChannel: true,
-          SendMessages: true,
-          ReadMessageHistory: true
-        });
-
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription(`➕ <@${userId}> a été ajouté au ticket.`);
-        return interaction.reply({ embeds: [embed] });
-
-      } catch (err) {
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription("❌ Impossible d’ajouter ce membre. Vérifie l’ID.");
-        return interaction.reply({ embeds: [embed], ephemeral: true });
-      }
+  // ───────── LOCK ─────────
+  if (action === "lock") {
+    if (!member.roles.cache.has(STAFF_ROLE)) {
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setDescription("❌ Tu n'as pas la permission de lock ce ticket.");
+      return interaction.reply({ embeds: [embed], ephemeral: true });
     }
+
+    // Trouver l'utilisateur créateur du ticket via le nom du salon
+    const parts = channel.name.split("-");
+    const userName = parts.slice(1).join("-");
+    const guildMember = channel.guild.members.cache.find(
+      m => m.user.username.replace(/[^a-zA-Z0-9-_]/g, "") === userName
+    );
+
+    if (guildMember) {
+      await channel.permissionOverwrites.edit(guildMember.id, { SendMessages: false });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(THEME_COLOR)
+      .setDescription("🔒 Ticket verrouillé pour l'utilisateur.");
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  // ───────── APPEL STAFF (UNE SEULE FOIS) ─────────
+  if (action === "call") {
+
+    if (channel.callStaffUsed) {
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setDescription("❌ Un appel staff a déjà été effectué dans ce ticket.");
+      return interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    channel.callStaffUsed = true;
+
+    const embed = new EmbedBuilder()
+      .setColor(THEME_COLOR)
+      .setDescription(`<@&${STAFF_ROLE}> 🔔 Un staff est demandé sur ce ticket.`);
+    return interaction.reply({ embeds: [embed] });
+  }
+
+  // ───────── AJOUTER UN MEMBRE (STAFF UNIQUEMENT) ─────────
+  if (action === "adduser") {
+
+    if (!member.roles.cache.has(STAFF_ROLE)) {
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setDescription("❌ Seul un membre du staff peut ajouter quelqu’un au ticket.");
+      return interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId("add_user_modal")
+      .setTitle("➕ Ajouter un membre au ticket");
+
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("user_id")
+          .setLabel("ID du membre à ajouter")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+      )
+    );
+
+    return interaction.showModal(modal);
+  }
+
+  // ───────── FERMER LE TICKET ─────────
+  if (action === "close") {
+    if (!member.roles.cache.has(STAFF_ROLE)) {
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setDescription("❌ Tu dois être staff pour fermer ce ticket.");
+      return interaction.reply({ embeds: [embed], ephemeral: true });
+    }
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("confirm_close")
+        .setLabel("Confirmer")
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji("⚠️"),
+      new ButtonBuilder()
+        .setCustomId("cancel_close")
+        .setLabel("Annuler")
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji("❌")
+    );
+
+    const embed = new EmbedBuilder()
+      .setColor(THEME_COLOR)
+      .setDescription("⚠️ Es-tu sûr de vouloir fermer ce ticket ?");
+    return interaction.reply({ embeds: [embed], components: [row] });
+  }
+}
+
+// ───────── MODAL : AJOUT D’UN MEMBRE ─────────
+if (interaction.isModalSubmit() && interaction.customId === "add_user_modal") {
+
+  const userId = interaction.fields.getTextInputValue("user_id");
+
+  try {
+    await interaction.channel.permissionOverwrites.edit(userId, {
+      ViewChannel: true,
+      SendMessages: true,
+      ReadMessageHistory: true
+    });
+
+    const embed = new EmbedBuilder()
+      .setColor(THEME_COLOR)
+      .setDescription(`➕ <@${userId}> a été ajouté au ticket.`);
+    return interaction.reply({ embeds: [embed] });
+
+  } catch (err) {
+    const embed = new EmbedBuilder()
+      .setColor(THEME_COLOR)
+      .setDescription("❌ Impossible d’ajouter ce membre. Vérifie l’ID.");
+    return interaction.reply({ embeds: [embed], ephemeral: true });
+  }
+}
+
 
     // ───────── BOUTONS : FERMETURE DU TICKET ─────────
     if (interaction.isButton()) {
