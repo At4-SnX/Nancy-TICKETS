@@ -364,13 +364,16 @@ client.on("interactionCreate", async (interaction) => {
           { label: "🗑️ Fermer", value: "close" }
         ]);
 
-      const pingRole = PING_ROLES[type] ? PING_ROLES[type] : PING_ROLES.default;
+      // rôle à ping selon le type
+const pingRole =
+  PING_ROLES[type] ? PING_ROLES[type] : PING_ROLES.default;
 
-      await channel.send({
-        content: `<@&${pingRole}>`,
-        embeds: [embedTicket],
-        components: [new ActionRowBuilder().addComponents(controlMenu)]
-      });
+await channel.send({
+  content: `<@&${pingRole}> <@${interaction.user.id}>`,
+  embeds: [embedTicket],
+  components: [new ActionRowBuilder().addComponents(controlMenu)]
+});
+
 
       const embedReply = new EmbedBuilder()
         .setColor(THEME_COLOR)
