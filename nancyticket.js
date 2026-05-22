@@ -134,7 +134,6 @@ client.on("interactionCreate", async (interaction) => {
         // Mise à jour du cache pour récupérer TOUS les membres
         await interaction.guild.members.fetch();
 
-        // Récupération de tous les staffs (sauf bots)
         const staffMembers = interaction.guild.members.cache
           .filter(m => m.roles.cache.has(STAFF_ROLE) && !m.user.bot);
 
@@ -266,40 +265,6 @@ client.on("interactionCreate", async (interaction) => {
     console.error("Erreur interaction :", err);
   }
 });
-
-
-  // ───────── SOUS-MENU : CHOIX DU STAFF À REPORTER ─────────
-if (interaction.isStringSelectMenu() && interaction.customId === "select_report_staff") {
-
-    // Mise à jour du cache pour récupérer TOUS les membres
-    await interaction.guild.members.fetch();
-
-    const staffId = interaction.values[0];
-
-    const modal = new ModalBuilder()
-        .setCustomId(`ticket_form_reportstaff_${staffId}`)
-        .setTitle("🛡️ Report Staff");
-
-    modal.addComponents(
-        new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-                .setCustomId("ticket_raison")
-                .setLabel("Raison du report")
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-                .setCustomId("ticket_preuve")
-                .setLabel("Preuve (facultatif)")
-                .setStyle(TextInputStyle.Paragraph)
-                .setRequired(false)
-        )
-    );
-
-    return interaction.showModal(modal);
-}
-
 
     // ───────── MODALS → CRÉATION DES TICKETS ─────────
     if (interaction.isModalSubmit() && interaction.customId.startsWith("ticket_form_")) {
