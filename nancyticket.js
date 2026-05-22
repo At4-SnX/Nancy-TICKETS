@@ -25,10 +25,6 @@ const fs = require("fs");
 // ─────────────────────────────────────────────
 
 const TOKEN = process.env.TOKEN;
-if (!TOKEN) {
-  console.error("❌ TOKEN manquant dans .env");
-  process.exit(1);
-}
 
 const THEME_COLOR = "#5865F2";
 
@@ -54,7 +50,7 @@ const CATEGORY_IDS = {
   legal: "1505943608832819282",
   illegal: "1505943610141442129",
   fondation: "1506374573535268885",
-  unban: "1506374094906720387" // change si tu veux une autre catégorie
+  unban: "1506374094906720387"
 };
 
 // noms FR pour les salons
@@ -88,7 +84,7 @@ client.once("ready", () => {
 });
 
 // ─────────────────────────────────────────────
-// PANEL : !sendpanel (ADMIN) — MENU SEUL
+// PANEL : !sendpanel
 // ─────────────────────────────────────────────
 
 client.on("messageCreate", async (message) => {
@@ -131,7 +127,6 @@ client.on("interactionCreate", async (interaction) => {
       // ───────── REPORT STAFF : CHOIX DU STAFF À REPORTER ─────────
       if (type === "reportstaff") {
 
-        // Mise à jour du cache pour récupérer TOUS les membres
         await interaction.guild.members.fetch();
 
         const staffMembers = interaction.guild.members.cache
@@ -259,34 +254,21 @@ client.on("interactionCreate", async (interaction) => {
       return interaction.showModal(modal);
     }
 
-    // (le reste de ton code continue ici…)
-
-  } catch (err) {
-    console.error("Erreur interaction :", err);
-  }
-});
-
-    // ───────── MODALS → CRÉATION DES TICKETS ─────────
+    // ───────── MODAL → CRÉATION DU TICKET ─────────
     if (interaction.isModalSubmit() && interaction.customId.startsWith("ticket_form_")) {
+
       let type = interaction.customId.replace("ticket_form_", "");
       let reportedStaffId = null;
 
-      // cas spécial reportstaff avec ID encodé
       if (type.startsWith("reportstaff_")) {
         reportedStaffId = type.split("_")[1];
         type = "reportstaff";
       }
 
       const categoryId = CATEGORY_IDS[type];
-      if (!categoryId) {
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription("❌ Catégorie de ticket invalide.");
-        return interaction.reply({ embeds: [embed], ephemeral: true });
-      }
 
       const existing = interaction.guild.channels.cache.find(
-        c => c.name.includes(`-${interaction.user.username}`)
+        c => c.name.includes(interaction.user.username)
       );
       if (existing) {
         const embed = new EmbedBuilder()
@@ -303,20 +285,26 @@ client.on("interactionCreate", async (interaction) => {
           `**Joueur :** ${interaction.fields.getTextInputValue("ticket_joueur")}\n` +
           `**Raison :** ${interaction.fields.getTextInputValue("ticket_raison")}\n` +
           `**Preuve :** ${interaction.fields.getTextInputValue("ticket_preuve") || "Aucune"}`;
-      } else if (type === "unban") {
+      }
+
+      else if (type === "unban") {
         description =
           `**Type : Demande d’unban**\n` +
           `**Nom :** ${interaction.fields.getTextInputValue("ticket_unban_nom")}\n` +
           `**Raison :** ${interaction.fields.getTextInputValue("ticket_unban_raison")}`;
-      } else if (type === "reportstaff") {
+      }
+
+      else if (type === "reportstaff") {
         description =
           `**Type : Report Staff**\n` +
           `**Staff reporté :** <@${reportedStaffId}>\n` +
           `**Raison :** ${interaction.fields.getTextInputValue("ticket_raison")}\n` +
           `**Preuve :** ${interaction.fields.getTextInputValue("ticket_preuve") || "Aucune"}`;
-      } else {
+      }
+
+      else {
         description =
-          `**Type : ${CATEGORY_LABELS_FR[type] || type}**\n` +
+          `**Type : ${CATEGORY_LABELS_FR[type]}**\n` +
           `**Détails :**\n${interaction.fields.getTextInputValue("ticket_details")}`;
       }
 
@@ -340,7 +328,6 @@ client.on("interactionCreate", async (interaction) => {
         }
       ];
 
-      // staff reporté explicitement exclu du ticket
       if (reportedStaffId) {
         overwrites.push({
           id: reportedStaffId,
@@ -352,7 +339,7 @@ client.on("interactionCreate", async (interaction) => {
         });
       }
 
-      const catLabel = CATEGORY_LABELS_FR[type] || type;
+      const catLabel = CATEGORY_LABELS_FR[type];
       const safeUser = interaction.user.username.replace(/[^a-zA-Z0-9-_]/g, "");
       const channelName = `・🎫・${catLabel}-${safeUser}`;
 
@@ -381,16 +368,13 @@ client.on("interactionCreate", async (interaction) => {
           { label: "🗑️ Fermer", value: "close" }
         ]);
 
-      // rôle à ping selon le type
-const pingRole =
-  PING_ROLES[type] ? PING_ROLES[type] : PING_ROLES.default;
+      const pingRole = PING_ROLES[type] || PING_ROLES.default;
 
-await channel.send({
-  content: `<@&${pingRole}> <@${interaction.user.id}>`,
-  embeds: [embedTicket],
-  components: [new ActionRowBuilder().addComponents(controlMenu)]
-});
-
+      await channel.send({
+        content: `<@&${pingRole}> <@${interaction.user.id}>`,
+        embeds: [embedTicket],
+        components: [new ActionRowBuilder().addComponents(controlMenu)]
+      });
 
       const embedReply = new EmbedBuilder()
         .setColor(THEME_COLOR)
@@ -427,9 +411,8 @@ await channel.send({
           return interaction.reply({ embeds: [embed], ephemeral: true });
         }
 
-        // retrouver l'utilisateur via le nom du salon
         const parts = channel.name.split("-");
-        const userName = parts.slice(1).join("-"); // après la catégorie
+        const userName = parts.slice(1).join("-");
         const guildMember = channel.guild.members.cache.find(m => m.user.username.replace(/[^a-zA-Z0-9-_]/g, "") === userName);
 
         if (guildMember) {
@@ -500,81 +483,4 @@ await channel.send({
 
     // ───────── MODAL : AJOUT D’UN MEMBRE ─────────
     if (interaction.isModalSubmit() && interaction.customId === "add_user_modal") {
-      const userId = interaction.fields.getTextInputValue("user_id");
-
-      try {
-        await interaction.channel.permissionOverwrites.edit(userId, {
-          ViewChannel: true,
-          SendMessages: true,
-          ReadMessageHistory: true
-        });
-
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription(`➕ <@${userId}> a été ajouté au ticket.`);
-        return interaction.reply({ embeds: [embed] });
-      } catch {
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription("❌ ID invalide ou impossible à ajouter.");
-        return interaction.reply({ embeds: [embed], ephemeral: true });
-      }
-    }
-
-    // ───────── BOUTONS : FERMETURE ─────────
-    if (interaction.isButton()) {
-      if (interaction.customId === "cancel_close") {
-        const embed = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription("❌ Fermeture annulée.");
-        return interaction.update({ embeds: [embed], components: [] });
-      }
-
-      if (interaction.customId === "confirm_close") {
-        const embedInfo = new EmbedBuilder()
-          .setColor(THEME_COLOR)
-          .setDescription("🗑️ Fermeture du ticket dans 2 secondes…");
-        await interaction.update({ embeds: [embedInfo], components: [] });
-
-        const messages = await interaction.channel.messages.fetch({ limit: 100 });
-        const transcript = messages
-          .reverse()
-          .map(m => `${m.createdAt.toISOString()} | ${m.author.tag}: ${m.content}`)
-          .join("\n");
-
-        const fileName = `transcript-${interaction.channel.id}.txt`;
-        fs.writeFileSync(fileName, transcript || "Aucun message dans ce ticket.");
-
-        const logChannel = interaction.guild.channels.cache.get(LOG_CHANNEL);
-        if (logChannel) {
-          const embedLog = new EmbedBuilder()
-            .setColor(THEME_COLOR)
-            .setDescription(`📄 Transcript du ticket **${interaction.channel.name}**`);
-          await logChannel.send({ embeds: [embedLog], files: [fileName] });
-        }
-
-        setTimeout(() => {
-          interaction.channel.delete().catch(() => {});
-          fs.unlink(fileName, () => {});
-        }, 2000);
-      }
-    }
-  } catch (err) {
-    console.error("Erreur interaction :", err);
-    if (interaction.isRepliable && !interaction.replied && !interaction.deferred) {
-      const embed = new EmbedBuilder()
-        .setColor(THEME_COLOR)
-        .setDescription("❌ Une erreur est survenue.");
-      interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => {});
-    }
-  }
-});
-
-// ─────────────────────────────────────────────
-// LOGIN
-// ─────────────────────────────────────────────
-
-client.login(TOKEN).catch(err => {
-  console.error("Erreur de connexion :", err);
-  process.exit(1);
-});
+      const userId = interaction.fields.getTextInputValue("
